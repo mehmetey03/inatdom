@@ -1,16 +1,39 @@
-    - name: Domain Check
-      env:
-        DEFAULT_DOMAIN: https://inattv1217.xyz/
+name: Domain Check and Update
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-update-domain:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: pip install requests
+
+    - name: Smart Domain Check and Update
       run: |
         if [ -f domain.txt ]; then
           CURRENT_DOMAIN=$(cut -d'=' -f2 domain.txt)
         else
-          CURRENT_DOMAIN="$DEFAULT_DOMAIN"
+          CURRENT_DOMAIN="https://inattv1217.xyz/"
           echo "guncel_domain=$CURRENT_DOMAIN" > domain.txt
         fi
 
         DOMAIN_NUMBER=$(echo "$CURRENT_DOMAIN" | grep -oE 'inattv[0-9]+' | grep -oE '[0-9]+' || echo "1217")
-        echo "Başlangıç: $DOMAIN_NUMBER"
+        echo "Başlangıç domain numarası: $DOMAIN_NUMBER"
 
         python3 -c "
 import requests, re
@@ -21,7 +44,7 @@ headers = {
 
 def check(domain):
     try:
-        r = requests.get(domain, timeout=8, headers=headers)
+        r = requests.get(domain, timeout=8, headers=headers, allow_redirects=True)
         if r.status_code != 200:
             return False
         t = r.text.lower()
@@ -33,6 +56,7 @@ start = int('$DOMAIN_NUMBER')
 current = '$CURRENT_DOMAIN'
 working = None
 
+# Önce mevcut domain
 if check(current):
     working = current
 else:
@@ -42,6 +66,7 @@ else:
             working = d
             break
 
+# Üst domain kontrolü
 if working:
     base = int(re.search(r'inattv(\d+)', working).group(1))
     for i in range(1,4):
@@ -51,8 +76,22 @@ if working:
         else:
             break
 else:
-    working = '$DEFAULT_DOMAIN'
+    working = 'https://inattv1217.xyz/'
 
-open('domain.txt','w').write(f'guncel_domain={working}')
+with open('domain.txt','w') as f:
+    f.write(f'guncel_domain={working}')
+
 print('Seçilen domain:', working)
 "
+
+    - name: Commit and push changes
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add domain.txt
+        if git diff --staged --quiet; then
+          echo "Değişiklik yok"
+        else
+          git commit -m "Güncel domain $(date '+%Y-%m-%d %H:%M')"
+          git push
+        fi
