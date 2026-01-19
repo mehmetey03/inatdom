@@ -1,4 +1,4 @@
-name: Domain Check and Update
+name: Inattv Domain Check
 
 on:
   schedule:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  check-and-update-domain:
+  check-domain:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,9 +19,10 @@ jobs:
         with:
           python-version: "3.10"
 
-      - run: pip install requests
+      - name: Install deps
+        run: pip install requests
 
-      - name: Prepare domain
+      - name: Check and update domain
         run: |
           if [ -f domain.txt ]; then
             CURRENT_DOMAIN=$(cut -d'=' -f2 domain.txt)
@@ -30,54 +31,44 @@ jobs:
             echo "guncel_domain=$CURRENT_DOMAIN" > domain.txt
           fi
 
-          echo "CURRENT_DOMAIN=$CURRENT_DOMAIN" >> $GITHUB_ENV
-
           if echo "$CURRENT_DOMAIN" | grep -q 'inattv[0-9]\+'; then
             DOMAIN_NUMBER=$(echo "$CURRENT_DOMAIN" | grep -o 'inattv[0-9]\+' | grep -o '[0-9]\+')
           else
             DOMAIN_NUMBER="1217"
           fi
 
-          echo "DOMAIN_NUMBER=$DOMAIN_NUMBER" >> $GITHUB_ENV
-
-      - name: Check domain
-        run: |
-          python3 << 'EOF'
-import requests, re, os
-
-headers = {"User-Agent": "Mozilla/5.0"}
-
-current = os.environ["CURRENT_DOMAIN"]
-start = int(os.environ["DOMAIN_NUMBER"])
-
-def ok(url):
+          python3 -c "import requests,re,sys
+headers={'User-Agent':'Mozilla/5.0'}
+def ok(u):
     try:
-        r = requests.get(url, timeout=8, headers=headers)
-        return r.status_code == 200 and "tv" in r.text.lower()
+        r=requests.get(u,timeout=8,headers=headers)
+        return r.status_code==200 and 'tv' in r.text.lower()
     except:
         return False
 
-working = current if ok(current) else None
+current='$CURRENT_DOMAIN'
+start=int('$DOMAIN_NUMBER')
+working=None
 
-if not working:
+if ok(current):
+    working=current
+else:
     for i in range(15):
-        d = f"https://inattv{start+i}.xyz/"
+        d=f'https://inattv{start+i}.xyz/'
         if ok(d):
-            working = d
+            working=d
             break
 
 if not working:
-    working = "https://inattv1217.xyz/"
+    working='https://inattv1217.xyz/'
 
-with open("domain.txt", "w") as f:
-    f.write(f"guncel_domain={working}")
+open('domain.txt','w').write(f'guncel_domain={working}')
+print('Güncel domain:',working)
+"
 
-print("Güncel:", working)
-EOF
-
-      - name: Commit
+      - name: Commit changes
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add domain.txt
-          git diff --staged --quiet || git commit -m "Domain update" && git push
+          git diff --staged --quiet || git commit -m "Update domain" && git push
