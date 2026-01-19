@@ -32,14 +32,14 @@ jobs:
           CURRENT_DOMAIN=$(grep -o 'guncel_domain=.*' domain.txt | cut -d'=' -f2)
           echo "Mevcut domain: $CURRENT_DOMAIN"
         else
-          CURRENT_DOMAIN="https://trgoals1423.xyz/"
+          CURRENT_DOMAIN="https://inattv1217.xyz/"
           echo "Yeni domain.txt oluşturuluyor: $CURRENT_DOMAIN"
           echo "guncel_domain=$CURRENT_DOMAIN" > domain.txt
         fi
 
         # Domain numarasını al (numara yoksa 1423 başlangıç değeri kullan)
-        if echo "$CURRENT_DOMAIN" | grep -q 'trgoals[0-9]\+'; then
-          DOMAIN_NUMBER=$(echo $CURRENT_DOMAIN | grep -o 'trgoals[0-9]\+' | grep -o '[0-9]\+')
+        if echo "$CURRENT_DOMAIN" | grep -q 'inattv[0-9]\+'; then
+          DOMAIN_NUMBER=$(echo $CURRENT_DOMAIN | grep -o 'inattv[0-9]\+' | grep -o '[0-9]\+')
         else
           DOMAIN_NUMBER="1423"
         fi
@@ -89,7 +89,7 @@ jobs:
         
         # Tüm domainleri kontrol etmek için for döngüsü
         for i in range(max_check):
-            current_check_domain = f'https://trgoals{start_domain_number + i}.xyz/'
+            current_check_domain = f'https://inattv{start_domain_number + i}.xyz/'
             
             # Mevcut domaini zaten kontrol ettik, tekrar etme
             if current_check_domain == current_domain:
@@ -104,14 +104,14 @@ jobs:
         # Döngü bittikten sonra en son bulunan çalışan domaini kullan
         if latest_working_domain:
             # En son çalışan domainin numarasını al
-            match = re.search(r'trgoals(\d+)', latest_working_domain)
+            match = re.search(r'inattv(\d+)', latest_working_domain)
             if match:
                 latest_domain_number = int(match.group(1))
                 selected_domain = latest_working_domain
                 
                 # 3 domain daha üstünü kontrol et
                 for extra in range(1, 4):
-                    next_domain = f'https://trgoals{latest_domain_number + extra}.xyz/'
+                    next_domain = f'https://inattv{latest_domain_number + extra}.xyz/'
                     next_active = check_domain(next_domain)
                     print(f'{extra}. üst domain kontrol: {next_domain} - Aktif: {next_active}')
                     
@@ -127,7 +127,7 @@ jobs:
                 selected_domain = latest_working_domain
         else:
             # Hiç çalışan domain bulunamadı, varsayılanı kullan
-            selected_domain = 'https://trgoals1423.xyz/'
+            selected_domain = 'https://inattv1217.xyz/'
             print(f'Hiç çalışan domain bulunamadı, varsayılan kullanılacak: {selected_domain}')
         
         # domain.txt'yi güncelle
