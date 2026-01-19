@@ -34,7 +34,7 @@ jobs:
         DOMAIN_NUMBER=$(echo "$CURRENT_DOMAIN" | grep -oE 'inattv[0-9]+' | grep -oE '[0-9]+' || echo "1217")
 
         python3 <<'PYCODE'
-import requests, re, os
+import requests, re
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -69,7 +69,7 @@ else:
 
 if working:
     base = int(re.search(r"inattv(\d+)", working).group(1))
-    for i in range(1,4):
+    for i in range(1, 4):
         d = f"https://inattv{base+i}.xyz/"
         if check(d):
             working = d
