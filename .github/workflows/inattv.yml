@@ -1,4 +1,5 @@
-name: Domain inattv 
+name: Domain inattv
+
 on:
   schedule:
     - cron: '*/30 * * * *'
@@ -10,12 +11,9 @@ permissions:
 jobs:
   check-and-update-domain:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/checkout@v4
 
     - name: Setup Python
       uses: actions/setup-python@v5
@@ -23,212 +21,79 @@ jobs:
         python-version: '3.10'
 
     - name: Install dependencies
-      run: pip install requests beautifulsoup4
+      run: pip install requests
 
-    - name: Smart Domain Check and Update
+    - name: Domain Check
       env:
-        CURRENT_DOMAIN: ${{ steps.get-domain.outputs.domain || 'https://inattv1217.xyz/' }}
+        DEFAULT_DOMAIN: https://inattv1217.xyz/
       run: |
-        # Önce domain.txt'yi kontrol et
-        if [ -f "domain.txt" ]; then
-          echo "domain.txt dosyası bulundu"
-          CURRENT_DOMAIN=$(grep -o 'guncel_domain=.*' domain.txt | cut -d'=' -f2)
-          echo "Mevcut domain: $CURRENT_DOMAIN"
+        if [ -f domain.txt ]; then
+          CURRENT_DOMAIN=$(cut -d'=' -f2 domain.txt)
         else
-          CURRENT_DOMAIN="https://inattv1217.xyz/"
-          echo "Yeni domain.txt oluşturuluyor: $CURRENT_DOMAIN"
+          CURRENT_DOMAIN="$DEFAULT_DOMAIN"
           echo "guncel_domain=$CURRENT_DOMAIN" > domain.txt
         fi
 
-        # Domain numarasını al (inattv pattern'ine göre)
-        DOMAIN_NUMBER="1217"  # Varsayılan değer
-        
-        if echo "$CURRENT_DOMAIN" | grep -q 'inattv[0-9]\+'; then
-          DOMAIN_NUMBER=$(echo "$CURRENT_DOMAIN" | grep -o 'inattv[0-9]\+' | grep -o '[0-9]\+')
-          echo "Bulunan domain numarası: $DOMAIN_NUMBER"
-        elif echo "$CURRENT_DOMAIN" | grep -q 'inatspor[0-9]\+'; then
-          # Eğer inatspor domaini varsa, default değer kullan
-          echo "inatspor domaini bulundu, varsayılan 1217 kullanılacak"
-        else
-          echo "Domain numarası bulunamadı, varsayılan: $DOMAIN_NUMBER"
-        fi
+        DOMAIN_NUMBER=$(echo "$CURRENT_DOMAIN" | grep -oE 'inattv[0-9]+' | grep -oE '[0-9]+' || echo "1217")
+        echo "Başlangıç: $DOMAIN_NUMBER"
 
-        # Python scriptini çalıştır
-        python3 -c "
-import requests
-import re
-import sys
-import os
-from urllib3.exceptions import InsecureRequestWarning
+        python3 << EOF
+import requests, re
 
-# SSL uyarılarını bastır
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
-# Değişkenleri al
-current_domain = '$CURRENT_DOMAIN'
-domain_number_str = '$DOMAIN_NUMBER'
-
-print(f'Mevcut domain: {current_domain}')
-print(f'Domain numarası string: {domain_number_str}')
-
-# Domain numarasını integer'a çevir
-try:
-    start_domain_number = int(domain_number_str)
-    print(f'Başlangıç domain numarası (int): {start_domain_number}')
-except ValueError:
-    print(f'Hata: Domain numarası geçersiz: {domain_number_str}')
-    start_domain_number = 1217
-    print(f'Varsayılan domain numarası kullanılıyor: {start_domain_number}')
-
-# Gerçekçi bir User-Agent başlığı tanımla
 headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-    'Accept-Encoding': 'gzip, deflate',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1',
-    'Cache-Control': 'max-age=0'
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 }
 
-def check_domain(domain):
+def check(domain):
     try:
-        print(f'Kontrol ediliyor: {domain}')
-        # İsteği User-Agent başlığı ile gönder, SSL doğrulamasını devre dışı bırak
-        response = requests.get(
-            domain, 
-            timeout=5, 
-            allow_redirects=True, 
-            headers=headers,
-            verify=False
-        )
-        print(f'  Status Code: {response.status_code}')
-        
-        # 200 status code kontrolü
-        if response.status_code == 200:
-            # Sayfa içeriğinde belirli kelimeleri kontrol et (case-insensitive)
-            content = response.text.lower()
-            
-            # Sayfanın boş olup olmadığını kontrol et
-            if len(content.strip()) < 100:
-                print(f'  Uyarı: Sayfa içeriği çok kısa ({len(content)} karakter)')
-                return False
-            
-            # İnat TV için gerekli anahtar kelimeler
-            key_terms = ['channel', 'matches', 'live', 'tv', 'spor', 'yayın', 'beinsports', 'tivibu']
-            found_terms = [term for term in key_terms if term in content]
-            
-            if found_terms:
-                print(f'  Bulunan terimler: {found_terms}')
-                # Ek olarak 'channel.html' veya 'matches-tab' linki var mı kontrol et
-                if 'channel.html' in content or 'matches-tab' in content or 'live' in content:
-                    print(f'  ✅ Domain çalışıyor ve geçerli içerik var')
-                    return True
-            
-            print(f'  ❌ Geçerli içerik bulunamadı')
+        r = requests.get(domain, timeout=8, headers=headers)
+        if r.status_code != 200:
             return False
-        
-        print(f'  ❌ Status code {response.status_code}')
-        return False
-        
-    except requests.exceptions.Timeout:
-        print(f'  ❌ Timeout hatası')
-        return False
-    except requests.exceptions.ConnectionError:
-        print(f'  ❌ Bağlantı hatası')
-        return False
-    except requests.exceptions.RequestException as e:
-        print(f'  ❌ İstek hatası: {e}')
-        return False
-    except Exception as e:
-        print(f'  ❌ Beklenmeyen hata: {e}')
+        text = r.text.lower()
+        return "<title>" in text and ("tv" in text or "canli" in text or "spor" in text)
+    except:
         return False
 
-# Önce mevcut domaini kontrol et
-print('\\n1. Mevcut domain kontrol ediliyor...')
-latest_working_domain = None
+start = int("$DOMAIN_NUMBER")
+working = None
 
-if check_domain(current_domain):
-    latest_working_domain = current_domain
-    print(f'✓ Mevcut domain çalışıyor: {current_domain}')
+# Önce mevcut
+current = "$CURRENT_DOMAIN"
+if check(current):
+    working = current
 else:
-    print(f'✗ Mevcut domain çalışmıyor: {current_domain}')
+    for i in range(0, 15):
+        d = f"https://inattv{start+i}.xyz/"
+        if check(d):
+            working = d
+            break
 
-# Yeni domainleri kontrol et (inattv pattern'ine göre)
-max_check = 15  # Kontrol edilecek maksimum domain sayısı
-found_new = False
-
-print(f'\\n2. Yeni inattv domainleri kontrol ediliyor ({max_check} domain)...')
-for i in range(max_check):
-    current_num = start_domain_number + i
-    test_domain = f'https://inattv{current_num}.xyz/'
-    
-    # Mevcut domaini zaten kontrol ettik, tekrar etme
-    if test_domain == current_domain:
-        continue
-        
-    print(f'\\nDomain {current_num}:')
-    if check_domain(test_domain):
-        if not found_new:
-            print(f'  🎯 Yeni aktif domain bulundu: {test_domain}')
-            found_new = True
-        latest_working_domain = test_domain
-        start_domain_number = current_num  # Bulunan domainden devam et
-
-# Üst domainleri kontrol et
-if latest_working_domain:
-    print(f'\\n3. Üst domainler kontrol ediliyor...')
-    match = re.search(r'inattv(\\d+)', latest_working_domain)
-    if match:
-        latest_domain_number = int(match.group(1))
-        selected_domain = latest_working_domain
-        
-        # 3 domain daha üstünü kontrol et
-        for extra in range(1, 4):
-            next_domain = f'https://inattv{latest_domain_number + extra}.xyz/'
-            print(f'\\n{extra}. üst domain ({latest_domain_number + extra}):')
-            
-            if check_domain(next_domain):
-                selected_domain = next_domain
-                print(f'  🔼 Üst domain aktif, güncelleniyor: {selected_domain}')
-            else:
-                print(f'  ✖ Üst domain çalışmıyor')
-                break
-        
-        print(f'\\n🎯 Seçilen domain: {selected_domain}')
-    else:
-        selected_domain = latest_working_domain
+# Üst domain denemeleri
+if working:
+    base = int(re.search(r'inattv(\d+)', working).group(1))
+    for i in range(1, 4):
+        d = f"https://inattv{base+i}.xyz/"
+        if check(d):
+            working = d
+        else:
+            break
 else:
-    # Hiç çalışan domain bulunamadı, varsayılanı kullan
-    selected_domain = 'https://inattv1217.xyz/'
-    print(f'\\n⚠ Hiç çalışan domain bulunamadı, varsayılan kullanılacak: {selected_domain}')
+    working = "$DEFAULT_DOMAIN"
 
-# domain.txt'yi güncelle
-with open('domain.txt', 'w') as f:
-    f.write(f'guncel_domain={selected_domain}')
+with open("domain.txt", "w") as f:
+    f.write(f"guncel_domain={working}")
 
-print(f'\\n✅ Güncellenen domain: {selected_domain}')
+print("Seçilen domain:", working)
+EOF
 
-# Mevcut domain ile yeni domain aynı mı kontrol et
-if selected_domain == current_domain:
-    print(f'\\nℹ Domain değişmedi')
-else:
-    print(f'\\n🔄 Domain değişti: {current_domain} -> {selected_domain}')
-"
-
-    - name: Commit and push changes
+    - name: Commit changes
       run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@github.com"
-        
-        # Değişiklikleri ekle
+        git config user.name github-actions
+        git config user.email github-actions@github.com
         git add domain.txt
-        
-        # Değişiklik varsa commit et
-        if ! git diff --staged --quiet; then
-          git commit -m "Güncel domain: $(date '+%Y-%m-%d %H:%M:%S')"
-          git push
-          echo "✅ Değişiklikler push edildi"
+        if git diff --staged --quiet; then
+          echo "Değişiklik yok"
         else
-          echo "ℹ Değişiklik yok, commit atlanıyor"
+          git commit -m "Güncel domain $(date '+%Y-%m-%d %H:%M')"
+          git push
         fi
