@@ -1,28 +1,3 @@
-name: Domain inattv
-
-on:
-  schedule:
-    - cron: '*/30 * * * *'
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
-jobs:
-  check-and-update-domain:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-
-    - name: Install dependencies
-      run: pip install requests
-
     - name: Domain Check
       env:
         DEFAULT_DOMAIN: https://inattv1217.xyz/
@@ -37,11 +12,11 @@ jobs:
         DOMAIN_NUMBER=$(echo "$CURRENT_DOMAIN" | grep -oE 'inattv[0-9]+' | grep -oE '[0-9]+' || echo "1217")
         echo "Başlangıç: $DOMAIN_NUMBER"
 
-        python3 << EOF
+        python3 -c "
 import requests, re
 
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
 }
 
 def check(domain):
@@ -49,51 +24,35 @@ def check(domain):
         r = requests.get(domain, timeout=8, headers=headers)
         if r.status_code != 200:
             return False
-        text = r.text.lower()
-        return "<title>" in text and ("tv" in text or "canli" in text or "spor" in text)
+        t = r.text.lower()
+        return '<title>' in t and ('tv' in t or 'canli' in t or 'spor' in t)
     except:
         return False
 
-start = int("$DOMAIN_NUMBER")
+start = int('$DOMAIN_NUMBER')
+current = '$CURRENT_DOMAIN'
 working = None
 
-# Önce mevcut
-current = "$CURRENT_DOMAIN"
 if check(current):
     working = current
 else:
-    for i in range(0, 15):
-        d = f"https://inattv{start+i}.xyz/"
+    for i in range(15):
+        d = f'https://inattv{start+i}.xyz/'
         if check(d):
             working = d
             break
 
-# Üst domain denemeleri
 if working:
     base = int(re.search(r'inattv(\d+)', working).group(1))
-    for i in range(1, 4):
-        d = f"https://inattv{base+i}.xyz/"
+    for i in range(1,4):
+        d = f'https://inattv{base+i}.xyz/'
         if check(d):
             working = d
         else:
             break
 else:
-    working = "$DEFAULT_DOMAIN"
+    working = '$DEFAULT_DOMAIN'
 
-with open("domain.txt", "w") as f:
-    f.write(f"guncel_domain={working}")
-
-print("Seçilen domain:", working)
-EOF
-
-    - name: Commit changes
-      run: |
-        git config user.name github-actions
-        git config user.email github-actions@github.com
-        git add domain.txt
-        if git diff --staged --quiet; then
-          echo "Değişiklik yok"
-        else
-          git commit -m "Güncel domain $(date '+%Y-%m-%d %H:%M')"
-          git push
-        fi
+open('domain.txt','w').write(f'guncel_domain={working}')
+print('Seçilen domain:', working)
+"
