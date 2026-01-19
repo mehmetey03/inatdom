@@ -32,14 +32,14 @@ jobs:
           CURRENT_DOMAIN=$(grep -o 'guncel_domain=.*' domain.txt | cut -d'=' -f2)
           echo "Mevcut domain: $CURRENT_DOMAIN"
         else
-          CURRENT_DOMAIN="https://inatspor12.xyz/"
+          CURRENT_DOMAIN="https://inattv1217.xyz/"
           echo "Yeni domain.txt oluşturuluyor: $CURRENT_DOMAIN"
           echo "guncel_domain=$CURRENT_DOMAIN" > domain.txt
         fi
 
         # Domain numarasını al (numara yoksa 12 başlangıç değeri kullan)
-        if echo "$CURRENT_DOMAIN" | grep -q 'inatspor[0-9]\+'; then
-          DOMAIN_NUMBER=$(echo $CURRENT_DOMAIN | grep -o 'inatspor[0-9]\+' | grep -o '[0-9]\+')
+        if echo "$CURRENT_DOMAIN" | grep -q 'inattv[1000-9999]\+'; then
+          DOMAIN_NUMBER=$(echo $CURRENT_DOMAIN | grep -o 'inattv[1000-9999]\+' | grep -o '[1000-9999]\+')
         else
           DOMAIN_NUMBER="12"
         fi
