@@ -33,56 +33,29 @@ jobs:
 
         DOMAIN_NUMBER=$(echo "$CURRENT_DOMAIN" | grep -oE 'inattv[0-9]+' | grep -oE '[0-9]+' || echo "1217")
 
-        python3 <<'PYCODE'
-import requests, re
-
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-}
-
-def check(domain):
-    try:
-        r = requests.get(domain, timeout=8, headers=headers, allow_redirects=True)
-        if r.status_code != 200:
-            return False
-        t = r.text.lower()
-        return "<title>" in t and ("tv" in t or "canli" in t or "spor" in t)
-    except:
-        return False
-
-with open("domain.txt") as f:
-    current = f.read().split("=")[1].strip()
-
-m = re.search(r"inattv(\d+)", current)
-start = int(m.group(1)) if m else 1217
-
-working = None
-
-if check(current):
-    working = current
-else:
-    for i in range(15):
-        d = f"https://inattv{start+i}.xyz/"
-        if check(d):
-            working = d
-            break
-
-if working:
-    base = int(re.search(r"inattv(\d+)", working).group(1))
-    for i in range(1, 4):
-        d = f"https://inattv{base+i}.xyz/"
-        if check(d):
-            working = d
-        else:
-            break
-else:
-    working = "https://inattv1217.xyz/"
-
-with open("domain.txt", "w") as f:
-    f.write(f"guncel_domain={working}")
-
-print("Secilen domain:", working)
-PYCODE
+        python3 -c 'import requests,re;headers={"User-Agent":"Mozilla/5.0"}; \
+def check(d): \
+    import requests; \
+    try: \
+        r=requests.get(d,timeout=8,headers=headers,allow_redirects=True); \
+        return r.status_code==200 and "<title>" in r.text.lower(); \
+    except: return False; \
+current="'$CURRENT_DOMAIN'"; \
+m=re.search(r"inattv(\d+)",current); \
+start=int(m.group(1)) if m else 1217; \
+working=None; \
+working=current if check(current) else None; \
+ \
+working = working or next((f"https://inattv{start+i}.xyz/" for i in range(15) if check(f"https://inattv{start+i}.xyz/")), None); \
+ \
+if working: \
+    base=int(re.search(r"inattv(\d+)",working).group(1)); \
+    for i in range(1,4): \
+        d=f"https://inattv{base+i}.xyz/"; \
+        working=d if check(d) else working; \
+else: working="https://inattv1217.xyz/"; \
+open("domain.txt","w").write(f"guncel_domain={working}"); \
+print("Secilen domain:",working)'
 
     - name: Commit
       run: |
